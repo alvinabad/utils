@@ -1,0 +1,81 @@
+#-------------------------------------------------------------------------------
+# Load ssh-agent Utilities
+#-------------------------------------------------------------------------------
+
+SSH_AGENT_ENV_FILE=~/.ssh/ssh-agent.env
+
+#-------------------------------------------------------------------------------
+# Load ssh agent
+#-------------------------------------------------------------------------------
+load_ssh_agent() {
+    # Load ssh-agent using our default agent file
+    # If file doesn't exist, load a new ssh-agent and create the new file
+    # If the file exist, source it and check if it's valid
+    # if If it's not valid, load new ssh-agent daemon
+    # If it's valid with some keys added, display the keys information
+    # if it's valid but no keys, suggest to add keys to it
+
+    if [ -e "$SSH_AGENT_ENV_FILE" ]; then
+        echo "ssh-agent file found: $SSH_AGENT_ENV_FILE"
+        source $SSH_AGENT_ENV_FILE
+        ssh-add -l
+        status=$?
+        if [ $status -gt 1 ]; then
+            create_ssh_agent
+        elif [ $status -eq 0 ]; then
+            echo "Load more identities by running ssh-add"
+        elif [ $status -eq 1 ]; then
+            echo "Run ssh-add to load keys"
+            echo ----------------------------------------
+            find ~/.ssh | grep rsa
+            echo ----------------------------------------
+        fi
+    else
+        create_ssh_agent
+    fi
+}
+
+#-------------------------------------------------------------------------------
+# Load new ssh agent
+#-------------------------------------------------------------------------------
+create_ssh_agent() {
+    # Create new ssh-agent daemon
+    # Before creating, kill off all existing agents. The default is to maintain
+    # only one agent running
+
+    kill_ssh_agent
+    echo "Loading new ssh agent"
+
+    ssh-agent > $SSH_AGENT_ENV_FILE
+    if [ $? -eq 0 ]; then
+        source $SSH_AGENT_ENV_FILE
+        echo "ssh-agent loaded. Run ssh-add to load keys"
+        find ~/.ssh | grep rsa
+    fi
+}
+
+#-------------------------------------------------------------------------------
+# kill ssh agent
+#-------------------------------------------------------------------------------
+kill_ssh_agent() {
+    # Kill ssh-agent from env file
+    # To be nice, kill agent using the agent file
+    # Next, kill everyone found
+
+    if [ -e "$SSH_AGENT_ENV_FILE" ]; then
+        echo "Killing ssh agent found in $SSH_AGENT_ENV_FILE"
+        source $SSH_AGENT_ENV_FILE
+        rm -f $SSH_AGENT_ENV_FILE
+        echo "Deleted: $SSH_AGENT_ENV_FILE"
+        ssh-agent -k
+    fi
+
+    pgrep -l ssh-agent
+    if [ $? -eq 0 ]; then
+        echo "Rogue agents found. killing..."
+        pkill -l ssh-agent
+    fi    
+}
+
+# load ssh-agent
+# load_ssh_agent
